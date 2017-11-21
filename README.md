@@ -20,7 +20,7 @@ Does not support:
 
 * `core` - the simulator code
 * `dcoss17elsts` - code for experiments for our DCOSS 2017 publication [1]
-* `adaptive_static_scheduling` - code for experiments for manuscript under review [2]
+* `adaptive_static_scheduling` - code for experiments for our IEEE WF-IoT 2018 publication [2]
 
 ## Getting started ##
 
@@ -48,9 +48,9 @@ Please cite the following paper if you use the simulator:
 
 [1] Atis Elsts, Xenofon Fafoutis, James Pope, George Oikonomou, Robert Piechocki and Ian Craddock. Scheduling High Rate Unpredictable Traffic in IEEE 802.15.4 TSCH Networks. In Proceedings of the 13th International Conference on Distributed Computing in Sensor Systems (DCOSS), IEEE, Ottawa, Canada, June 2017.
 
-The energy levels, energy efficiency and adaptive scheduling functionality are added in the subsequent paper (in preparation):
+The energy levels, energy efficiency and adaptive scheduling functionality are added in the subsequent paper:
 
-[2] Xenofon Fafoutis, Atis Elsts, George Oikonomou, Robert Piechocki and Ian Craddock. Adaptive Static Scheduling IEEE 802.15.4 TSCH Networks, manuscript under review, 2017.
+[2] Xenofon Fafoutis, Atis Elsts, George Oikonomou, Robert Piechocki and Ian Craddock. Adaptive Static Scheduling IEEE 802.15.4 TSCH Networks. In Proceedings of the 4th IEEE World Forum on Internet of Things (IEEE WF-IoT), Singapore, Singapore, February 2018.
 
 ## Acknowledgments ##
 
