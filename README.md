@@ -50,7 +50,8 @@ Please cite the following paper if you use the simulator:
 
 The energy levels, energy efficiency and adaptive scheduling functionality are added in the subsequent paper:
 
-[2] Xenofon Fafoutis, Atis Elsts, George Oikonomou, Robert Piechocki and Ian Craddock. Adaptive Static Scheduling IEEE 802.15.4 TSCH Networks. In Proceedings of the 4th IEEE World Forum on Internet of Things (IEEE WF-IoT), Singapore, Singapore, February 2018.
+[2] Xenofon Fafoutis, Atis Elsts, George Oikonomou, Robert Piechocki and Ian Craddock. Adaptive Static Scheduling in IEEE 802.15.4 TSCH Networks. In Proceedings of the 4th IEEE World Forum on Internet of Things (IEEE 
+WF-IoT), Singapore, Singapore, February 2018.
 
 ## Acknowledgments ##
 
