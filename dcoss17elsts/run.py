@@ -45,14 +45,14 @@ TOTAL_SLOTS = 80
 
 ################################################################################
 
-def simAny(packetsPerGw, prrlist, ccaSuccessProb, doOptimal, sharedslots):  
+def simAny(packetsPerGw, prrlist, ccaSuccessProb, algorithm, sharedslots):  
     stats = sim.Statistics(packetsPerGw)
     if sharedslots == 0:
         sim.simulateDedicated(stats, packetsPerGw, prrlist, False, TOTAL_SLOTS//len(packetsPerGw), 0)
     elif sharedslots == TOTAL_SLOTS:
         sim.simulateShared(stats, packetsPerGw, prrlist, ccaSuccessProb, TOTAL_SLOTS)
     else:
-        sim.simulatePartial(stats, packetsPerGw, prrlist, ccaSuccessProb, doOptimal, TOTAL_SLOTS, sharedslots)
+        sim.simulatePartial(stats, packetsPerGw, prrlist, ccaSuccessProb, algorithm, TOTAL_SLOTS, sharedslots)
 
     return stats
 
@@ -114,7 +114,7 @@ def exp2(traffic):
     print(pdr_results)
 
 
-def exp3(traffic, doOptimal):
+def exp3(traffic, algorithm):
     oldNumSlotframes = sim.NUM_SLOTFRAMES
     sim.NUM_SLOTFRAMES = 100000
 
@@ -133,7 +133,7 @@ def exp3(traffic, doOptimal):
         for i4 in range(N):
             p4 = prr[i4]
 
-            stats = simAny([traffic, traffic, traffic, traffic], [p1,p2, p3, p4], 0.7, doOptimal, slot_list[sharedslots])
+            stats = simAny([traffic, traffic, traffic, traffic], [p1,p2, p3, p4], 0.7, algorithm, slot_list[sharedslots])
             print("PDR at {} shared slots {} link quality: {}".format(slot_list[sharedslots], p4, stats.pdr))
             i += 1
             pdr_results[sharedslots] += stats.pdr
@@ -167,11 +167,11 @@ def exp4(traffic): # Fig. 6
         
         mean_list[i], std_list[i] = sim.std(prrlist)
         
-        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, True, 0)
+        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, sim.ALGORITHM_CONTIKI_NEGOTIATED, 0)
         pdr_results_0[i] =  1 - stats.pdr/100.0
-        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, True, 8)
+        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, sim.ALGORITHM_CONTIKI_NEGOTIATED, 8)
         pdr_results_8[i] =  1 - stats.pdr/100.0
-        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, True, 16)
+        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, sim.ALGORITHM_CONTIKI_NEGOTIATED, 16)
         pdr_results_16[i] = 1 - stats.pdr/100.0
         
         traffic_list[i] = traffic
@@ -210,4 +210,8 @@ if 0:
 
 # This produces data for Figure 8 from the paper
 if 1:
-    exp3(10, False)
+    exp3(6, sim.ALGORITHM_CONTIKI)
+
+# This produces improved version of the experiment with negotiated shared schedule
+if 1:
+    exp3(6, sim.ALGORITHM_CONTIKI_NEGOTIATED)

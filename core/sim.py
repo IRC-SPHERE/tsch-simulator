@@ -47,6 +47,10 @@ INACTIVE = -2
 # Shared slots are marked by this
 SHARED = -1
 
+ALGORITHM_OPTIMAL = 0
+ALGORITHM_CONTIKI = 1
+ALGORITHM_CONTIKI_NEGOTIATED = 2
+
 ##############################################
 
 # Utility function to avoid including numpy - not well supported by PyPy
@@ -142,6 +146,7 @@ class Packet:
         self.tx = 0
         self.gw = gw
         self.backoff = 0
+        self.more = 0
 
     def send(self):
         self.tx += 1
@@ -163,7 +168,7 @@ class Gw:
         self.numLostPackets = 0
         self.prr = p
         self.col = 0
-
+        self.useNextSharedSlot = 0
 
         self.aslot = s
         self.aslotmax = s_max
@@ -260,6 +265,40 @@ def getPacketsContiki(senderSlot, gws, numSharedSlots):
                     #print("backoff")
     return packets
 
+#
+# This algorithm always avoid collisions in shared slots by negotiating
+# which gateway will use the slot beforehand.
+#
+def getPacketsContikiNegotiated(senderSlot, gws, numSharedSlots):
+    packets = []
+
+    if senderSlot == INACTIVE:
+        return packets
+   
+    if senderSlot != SHARED:
+        # dedicated slot
+        gw = gws[senderSlot]
+        if len(gw.queue):
+            packet = gw.queue[0]
+            gw.queue = gw.queue[1:]
+            packet.more = len(gw.queue) > 2 # set the MORE bit to 0 or 1
+            packets.append(packet)
+    else:
+        bestgw = None
+        # shared slot
+        for gw in gws:
+            # if the slot is negotiated:
+            if gw.useNextSharedSlot:
+                gw.useNextSharedSlot = False
+                if len(gw.queue):
+                    packet = gw.queue[0]
+                    gw.queue = gw.queue[1:]
+                    packet.more = len(gw.queue) > 2 # set the MORE bit to 0 or 1
+                    packets.append(packet)               
+                    pass
+                break
+    return packets
+
 
 def updateSlotFrame(slotframe, gws, asn, gw):
     if gw.u > 0.9:
@@ -282,16 +321,29 @@ def updateSlotFrame(slotframe, gws, asn, gw):
 #
 # This simulates the operation of a single TSCH timeslot on all nodes.
 #
-def simSlot(stats, gws, asn, slotframe, traffic, ccaSuccessProb, doOptimal, numSharedSlots, adaptive):
+def simSlot(stats, gws, asn, slotframe, traffic, ccaSuccessProb,
+            algorithm, numSharedSlots, adaptive, sharedSlotReserved = None):
 
     si = asn % SLOTFRAME_SIZE
     for gw in gws:
         a = gw.scheduleNewPacket(si, traffic)
 
-    if doOptimal:
+    # on a shared slot, reset the state
+    if algorithm == ALGORITHM_CONTIKI_NEGOTIATED:
+        if slotframe[si] == SHARED:
+            if slotframe[(si + 1) % SLOTFRAME_SIZE] == SHARED:
+                print("Multiple subsequent shared slots not supported!")
+            sharedSlotReserved = None
+
+    if algorithm == ALGORITHM_OPTIMAL:
         packets = getPacketsOptimal(slotframe[si], gws)
-    else:
+    elif algorithm == ALGORITHM_CONTIKI:
         packets = getPacketsContiki(slotframe[si], gws, numSharedSlots)
+    elif algorithm == ALGORITHM_CONTIKI_NEGOTIATED:
+        packets = getPacketsContikiNegotiated(slotframe[si], gws, numSharedSlots)
+    else:
+        print("Unknown packet selection algotrithm: ", algorithm)
+        exit(-1)
 
     # Single packet, no collisions
     if len(packets) == 1:
@@ -304,6 +356,19 @@ def simSlot(stats, gws, asn, slotframe, traffic, ccaSuccessProb, doOptimal, numS
             # successful txrx
             if adaptive == True:
                 updateSlotFrame(slotframe, gws, asn, packet.gw)
+            if packet.more:
+                if sharedSlotReserved is None:
+                    # reserve the next shared slot for this gateway
+                    packet.gw.useNextSharedSlot = True
+                    sharedSlotReserved = packet.gw.id
+                    #print("reserve ", packet.gw.id, packet.more)
+            else:
+                if sharedSlotReserved == packet.gw.id:
+                    #print("unreserve ", packet.gw.id)
+                    # unreserve the next shared slot
+                    packet.gw.useNextSharedSlot = False
+                    sharedSlotReserved = None
+
         packet.gw.col = 0
         stats.txrx += 1
 
@@ -348,6 +413,9 @@ def simSlot(stats, gws, asn, slotframe, traffic, ccaSuccessProb, doOptimal, numS
             g = gws[slotframe[si]]
             g.u = (1 - g.alpha) * g.u + g.alpha * 0
 
+    # return None or th ID of the GW for which the next shared slot is reserved
+    return sharedSlotReserved
+
 #######################################################
 
 #
@@ -383,7 +451,7 @@ def simulateShared(stats, packetsPerGw, prrlist, ccaSuccessProb, total_shared):
     for s in range(NUM_SLOTFRAMES):
         for slot in range(SLOTFRAME_SIZE):
             asn = s * SLOTFRAME_SIZE + slot
-            simSlot(stats, gws, asn, slotframe, traffic, ccaSuccessProb, False, total_shared, False)
+            simSlot(stats, gws, asn, slotframe, traffic, ccaSuccessProb, ALGORITHM_CONTIKI, total_shared, False)
 
     stats.gwlist = gws
     stats.asn += 1
@@ -400,7 +468,7 @@ def simulateShared(stats, packetsPerGw, prrlist, ccaSuccessProb, total_shared):
 #
 # Simulates an operation with both shared and dedicated (collision free) slots.
 #
-def simulatePartial(stats, packetsPerGw, prrlist, ccaSuccessProb, doOptimal, totalSlots, sharedSlots):
+def simulatePartial(stats, packetsPerGw, prrlist, ccaSuccessProb, algorithm, totalSlots, sharedSlots):
     slotframe = [INACTIVE] * SLOTFRAME_SIZE
     traffic = getTraffic(packetsPerGw)       
     
@@ -412,23 +480,37 @@ def simulatePartial(stats, packetsPerGw, prrlist, ccaSuccessProb, doOptimal, tot
         gws.append(Gw(gw, prrlist[gw], NUM_DEDICATED_SLOTS, NUM_DEDICATED_SLOTS))
 
     sn = 0
+    numss = 0
+    ns = 0
     for slot in range(NUM_DEDICATED_SLOTS):
-        for gw in range(len(packetsPerGw)):
+        section = list(range(len(packetsPerGw)))
+        random.shuffle(section)
+        for gw in section:
             slotframe[sn] = gw
             sn += 1
 
-        for slot in range(NUM_SHARED_SLOTS_PER_SECOND // NUM_DEDICATED_SLOTS):
+        # distribute the shared slots evenly in the sloframe
+        ns += NUM_SHARED_SLOTS_PER_SECOND / float(NUM_DEDICATED_SLOTS)
+        for slot in range(int(ns)):
+            if numss < sharedSlots:
+                slotframe[sn] = SHARED
+                sn += 1
+                numss += 1
+        ns -= int(ns)
+
+    # pad with the remaining number of shared slots
+    for slot in range(NUM_SHARED_SLOTS_PER_SECOND - NUM_SHARED_SLOTS_PER_SECOND // NUM_DEDICATED_SLOTS * NUM_DEDICATED_SLOTS):
+        if numss < sharedSlots:
             slotframe[sn] = SHARED
             sn += 1
+            numss += 1
 
-    for slot in range(NUM_SHARED_SLOTS_PER_SECOND - NUM_SHARED_SLOTS_PER_SECOND // NUM_DEDICATED_SLOTS * NUM_DEDICATED_SLOTS):
-        slotframe[sn] = SHARED
-        sn += 1
-
+    isSharedSlotReserved = None
     for s in range(NUM_SLOTFRAMES):
         for slot in range(SLOTFRAME_SIZE):
             asn = s * SLOTFRAME_SIZE + slot
-            simSlot(stats, gws, asn, slotframe, traffic, ccaSuccessProb, doOptimal, NUM_SHARED_SLOTS_PER_SECOND, False)
+            isSharedSlotReserved = simSlot(stats, gws, asn, slotframe, traffic, ccaSuccessProb,
+                                           algorithm, NUM_SHARED_SLOTS_PER_SECOND, False, isSharedSlotReserved)
 
     stats.gwlist = gws
     stats.asn += 1
@@ -455,14 +537,18 @@ def simulateDedicated(stats, packetsPerGw, prrlist, adaptive, slots, slotsMax):
 
     sn = 0
     for slot in range(slots):
-        for gw in range(len(packetsPerGw)):
+        section = list(range(len(packetsPerGw)))
+        random.shuffle(section)
+        for gw in section:
             slotframe[sn] = gw
             sn += 1
+
+#    print(slotframe)
 
     for s in range(NUM_SLOTFRAMES):
         for slot in range(SLOTFRAME_SIZE):
             asn = s * SLOTFRAME_SIZE + slot
-            simSlot(stats, gws, asn, slotframe, traffic, 0.0, False, 0, adaptive)
+            simSlot(stats, gws, asn, slotframe, traffic, 0.0, ALGORITHM_CONTIKI, 0, adaptive)
 
     stats.gwlist = gws
     stats.asn = asn+1
