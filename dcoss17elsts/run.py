@@ -167,11 +167,11 @@ def exp4(traffic): # Fig. 6
         
         mean_list[i], std_list[i] = sim.std(prrlist)
         
-        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, sim.ALGORITHM_CONTIKI_NEGOTIATED, 0)
+        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, sim.ALGORITHM_CONTIKI, 0)
         pdr_results_0[i] =  1 - stats.pdr/100.0
-        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, sim.ALGORITHM_CONTIKI_NEGOTIATED, 8)
+        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, sim.ALGORITHM_CONTIKI, 8)
         pdr_results_8[i] =  1 - stats.pdr/100.0
-        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, sim.ALGORITHM_CONTIKI_NEGOTIATED, 16)
+        stats = simAny([traffic, traffic, traffic, traffic], prrlist, 0.7, sim.ALGORITHM_CONTIKI, 16)
         pdr_results_16[i] = 1 - stats.pdr/100.0
         
         traffic_list[i] = traffic
