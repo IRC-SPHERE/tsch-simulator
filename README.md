@@ -1,3 +1,5 @@
+**This work is deprecated, please use https://github.com/edi-riga/tsch-sim instead!**
+
 ## Overview ##
 
 Discrete-time event simulator for IEEE 802.15.4 TSCH networks.
